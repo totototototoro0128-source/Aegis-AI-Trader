@@ -2,10 +2,12 @@ import streamlit as st
 
 from modules.database import init_db
 from modules.watchlist import (
+    
     add_stock,
     get_stocks,
     delete_stock,
 )
+from modules.stock import get_stock_price
 
 # データベース初期化
 init_db()
@@ -52,15 +54,41 @@ else:
 
         stock_id, code, company = stock
 
+        stock_info = get_stock_price(code)
+
         col1, col2 = st.columns([8, 1])
 
         with col1:
-            st.write(f"**{code}**　{company}")
+
+            st.subheader(f"{code}　{company}")
+
+            if stock_info:
+
+                price = stock_info["price"]
+                previous = stock_info["previous_close"]
+
+                if price and previous:
+
+                    diff = price - previous
+                    rate = diff / previous * 100
+
+                    st.write(f"現在価格：{price:.2f} 円")
+
+                    if diff >= 0:
+                        st.success(f"前日比：+{diff:.2f} 円 ({rate:.2f}%)")
+                    else:
+                        st.error(f"前日比：{diff:.2f} 円 ({rate:.2f}%)")
+
+                else:
+                    st.warning("株価取得失敗")
+
+            else:
+                st.warning("株価取得失敗")
 
         with col2:
 
             if st.button("🗑", key=stock_id):
-
                 delete_stock(stock_id)
-
                 st.rerun()
+
+        st.divider()
