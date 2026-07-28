@@ -1,4 +1,12 @@
 import streamlit as st
+import plotly.graph_objects as go
+
+from modules.technical import (
+    get_history,
+    get_ma,
+    get_rsi,
+    get_macd,
+)
 
 from modules.database import init_db
 
@@ -9,12 +17,6 @@ from modules.watchlist import (
 )
 
 from modules.stock import get_stock_price
-
-from modules.technical import (
-    get_history,
-    get_ma,
-    get_rsi,
-)
 
 # -----------------------------
 # 初期設定
@@ -134,65 +136,123 @@ else:
 
 st.subheader("🧪 テクニカルテスト")
 
-history = get_history("7203")
+history = get_history(code)
+
+history["MA25"] = history["Close"].rolling(25).mean()
+history["MA75"] = history["Close"].rolling(75).mean()
 
 st.dataframe(history.tail())
 
-ma25 = get_ma("7203")
+fig = go.Figure()
 
-ma75 = get_ma("7203", 75)
+# ローソク足
+fig.add_trace(
+    go.Candlestick(
+        x=history.index,
+        open=history["Open"],
+        high=history["High"],
+        low=history["Low"],
+        close=history["Close"],
+        name="株価",
+    )
+)
 
-rsi = get_rsi("7203")
+# 25日移動平均
+fig.add_trace(
+    go.Scatter(
+        x=history.index,
+        y=history["MA25"],
+        mode="lines",
+        name="25日MA",
+    )
+)
 
-col1, col2, col3 = st.columns(3)
+# 75日移動平均
+fig.add_trace(
+    go.Scatter(
+        x=history.index,
+        y=history["MA75"],
+        mode="lines",
+        name="75日MA",
+    )
+)
+
+fig.update_layout(
+    title="7203 トヨタ",
+    xaxis_title="日付",
+    yaxis_title="株価（円）",
+    height=600,
+    xaxis_rangeslider_visible=False,
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
+ma25 = get_ma(code)
+ma75 = get_ma(code, 75)
+rsi = get_rsi(code)
+macd_history = get_macd(code)
+
+st.subheader("📊 MACD")
+
+fig_macd = go.Figure()
+
+# MACD
+fig_macd.add_trace(
+    go.Scatter(
+        x=macd_history.index,
+        y=macd_history["MACD"],
+        mode="lines",
+        name="MACD",
+    )
+)
+
+# Signal
+fig_macd.add_trace(
+    go.Scatter(
+        x=macd_history.index,
+        y=macd_history["Signal"],
+        mode="lines",
+        name="Signal",
+    )
+)
+
+# Histogram
+fig_macd.add_trace(
+    go.Bar(
+        x=macd_history.index,
+        y=macd_history["Histogram"],
+        name="Histogram",
+    )
+)
+
+fig_macd.update_layout(
+    title="MACD",
+    template="plotly_dark",
+    height=300,
+)
+
+st.plotly_chart(fig_macd, use_container_width=True)
+
+macd_value = macd_history["MACD"].iloc[-1]
+signal_value = macd_history["Signal"].iloc[-1]
+
+col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-
-    if ma25 is None:
-
-        st.metric("25日移動平均", "データ不足")
-
-    else:
-
-        st.metric(
-            "25日移動平均",
-            f"{ma25:.2f} 円"
-        )
+    st.metric("25日移動平均", f"{ma25:.2f} 円")
 
 with col2:
-
-    if ma75 is None:
-
-        st.metric("75日移動平均", "データ不足")
-
-    else:
-
-        st.metric(
-            "75日移動平均",
-            f"{ma75:.2f} 円"
-        )
+    st.metric("75日移動平均", f"{ma75:.2f} 円")
 
 with col3:
+    st.metric("RSI", f"{rsi:.2f}")
 
-    if rsi is None:
-
-        st.metric("RSI", "データ不足")
-
+    if rsi >= 70:
+        st.error("買われすぎ")
+    elif rsi <= 30:
+        st.success("売られすぎ")
     else:
+        st.info("中立")
 
-        st.metric(
-            "RSI",
-            f"{rsi:.2f}"
-        )
-
-        if rsi >= 70:
-
-            st.error("🔴 買われすぎ")
-
-        elif rsi <= 30:
-
-            st.success("🟢 売られすぎ")
-
-        else:
-
-            st.info("🟡 中立")
+with col4:
+    st.metric("MACD", f"{macd_value:.2f}")

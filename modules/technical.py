@@ -63,3 +63,31 @@ def get_rsi(code, period=14):
         return None
 
     return float(rsi.iloc[-1])
+
+
+def get_macd(code):
+    """
+    MACDを計算する
+    """
+
+    history = get_history(code).copy()
+
+    if history.empty:
+        return history
+
+    close = history["Close"]
+
+    # EMA
+    ema12 = close.ewm(span=12, adjust=False).mean()
+    ema26 = close.ewm(span=26, adjust=False).mean()
+
+    # MACD
+    history["MACD"] = ema12 - ema26
+
+    # シグナル
+    history["Signal"] = history["MACD"].ewm(span=9, adjust=False).mean()
+
+    # ヒストグラム
+    history["Histogram"] = history["MACD"] - history["Signal"]
+
+    return history
