@@ -18,6 +18,8 @@ from modules.watchlist import (
 
 from modules.stock import get_stock_price
 
+from modules.company import get_company_name
+
 # -----------------------------
 # 初期設定
 # -----------------------------
@@ -32,6 +34,15 @@ st.set_page_config(
 
 st.title("📈 AI Investment Assistant")
 
+# -----------------------------
+# 選択中の銘柄
+# -----------------------------
+
+if "selected_code" not in st.session_state:
+    st.session_state.selected_code = "7203"
+
+if "selected_company" not in st.session_state:
+    st.session_state.selected_company = "トヨタ"
 st.divider()
 
 # -----------------------------
@@ -42,7 +53,26 @@ st.subheader("➕ 銘柄追加")
 
 code = st.text_input("銘柄コード")
 
-company = st.text_input("会社名")
+company = ""
+
+if code:
+
+    company = get_company_name(code)
+
+if company:
+
+    st.text_input(
+        "会社名",
+        value=company,
+        disabled=True,
+    )
+
+else:
+
+    st.text_input(
+        "会社名",
+        value="",
+    )
 
 if st.button("追加"):
 
@@ -79,6 +109,14 @@ else:
         stock_id, code, company = stock
 
         stock_info = get_stock_price(code)
+        
+        if st.button(f"📈 {code} {company}", key=f"select_{stock_id}"):
+
+            st.session_state.selected_code = code
+
+            st.session_state.selected_company = company
+
+            st.rerun()
 
         col1, col2 = st.columns([8, 1])
 
@@ -136,7 +174,9 @@ else:
 
 st.subheader("🧪 テクニカルテスト")
 
-history = get_history(code)
+history = get_history(
+    st.session_state.selected_code
+)
 
 history["MA25"] = history["Close"].rolling(25).mean()
 history["MA75"] = history["Close"].rolling(75).mean()
@@ -178,7 +218,7 @@ fig.add_trace(
 )
 
 fig.update_layout(
-    title="7203 トヨタ",
+    title=f"{st.session_state.selected_code} {st.session_state.selected_company}",
     xaxis_title="日付",
     yaxis_title="株価（円）",
     height=600,
@@ -187,10 +227,10 @@ fig.update_layout(
 
 st.plotly_chart(fig, use_container_width=True)
 
-ma25 = get_ma(code)
-ma75 = get_ma(code, 75)
-rsi = get_rsi(code)
-macd_history = get_macd(code)
+ma25 = get_ma(st.session_state.selected_code)
+ma75 = get_ma(st.session_state.selected_code, 75)
+rsi = get_rsi(st.session_state.selected_code)
+macd_history = get_macd(st.session_state.selected_code)
 
 st.subheader("📊 MACD")
 
