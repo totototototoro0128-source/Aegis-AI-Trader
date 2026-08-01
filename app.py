@@ -162,7 +162,7 @@ else:
 
         with col2:
 
-            if st.button("🗑", key=stock_id):
+            if st.button("🗑", key=f"delete_{stock_id}"):
 
                 delete_stock(stock_id)
 
@@ -196,6 +196,12 @@ fig.add_trace(
         low=history["Low"],
         close=history["Close"],
         name="株価",
+
+        increasing_line_color="#26A69A",
+        increasing_fillcolor="#26A69A",
+
+        decreasing_line_color="#EF5350",
+        decreasing_fillcolor="#EF5350",
     )
 )
 
@@ -206,6 +212,11 @@ fig.add_trace(
         y=history["MA25"],
         mode="lines",
         name="25日MA",
+
+        line=dict(
+            color="#2962FF",
+            width=2,
+        ),
     )
 )
 
@@ -216,6 +227,11 @@ fig.add_trace(
         y=history["MA75"],
         mode="lines",
         name="75日MA",
+
+        line=dict(
+            color="#FF9800",
+            width=2,
+        ),
     )
 )
 
@@ -224,7 +240,19 @@ fig.update_layout(
     xaxis_title="日付",
     yaxis_title="株価（円）",
     height=600,
+    template="plotly_white",
+    hovermode="x unified",
     xaxis_rangeslider_visible=False,
+
+    xaxis=dict(
+        tickformat="%Y/%m/%d",
+        tickangle=-45,
+        showgrid=True,
+    ),
+
+    yaxis=dict(
+        showgrid=True,
+    ),
 )
 
 st.plotly_chart(fig, use_container_width=True)
@@ -245,6 +273,10 @@ fig_macd.add_trace(
         y=macd_history["MACD"],
         mode="lines",
         name="MACD",
+        line=dict(
+            color="#2962FF",
+            width=2,
+        ),
     )
 )
 
@@ -255,6 +287,10 @@ fig_macd.add_trace(
         y=macd_history["Signal"],
         mode="lines",
         name="Signal",
+        line=dict(
+            color="#FF9800",
+            width=2,
+        ),
     )
 )
 
@@ -264,13 +300,28 @@ fig_macd.add_trace(
         x=macd_history.index,
         y=macd_history["Histogram"],
         name="Histogram",
+        marker_color=[
+            "#26A69A" if x >= 0 else "#EF5350"
+            for x in macd_history["Histogram"]
+        ],
     )
 )
 
 fig_macd.update_layout(
     title="MACD",
-    template="plotly_dark",
     height=300,
+    template="plotly_white",
+    hovermode="x unified",
+    xaxis=dict(
+        title="日付",
+        tickformat="%Y/%m/%d",
+        tickangle=-45,
+        showgrid=True,
+    ),
+    yaxis=dict(
+        title="MACD",
+        showgrid=True,
+    ),
 )
 
 st.plotly_chart(fig_macd, use_container_width=True)
