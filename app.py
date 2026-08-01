@@ -18,6 +18,8 @@ from modules.watchlist import (
 
 from modules.stock import get_stock_price
 
+from modules.signal import analyze_stock
+
 from modules.company import get_company_name
 
 # -----------------------------
@@ -86,7 +88,7 @@ if st.button("追加"):
 
     else:
 
-        st.warning("銘柄コードと会社名を入力してください")
+        st.warning("正しい銘柄コードを入力してください")
 
 st.divider()
 
@@ -296,3 +298,31 @@ with col3:
 
 with col4:
     st.metric("MACD", f"{macd_value:.2f}")
+
+    st.divider()
+
+st.subheader("🤖 AI売買シグナル")
+
+signal = analyze_stock(st.session_state.selected_code)
+
+if signal:
+
+    st.metric("総合スコア", f"{signal['score']} 点")
+
+    if signal["score"] >= 80:
+        st.success("★★★★★　強い買い")
+
+    elif signal["score"] >= 60:
+        st.info("★★★★☆　買い")
+
+    elif signal["score"] >= 40:
+        st.warning("★★★☆☆　様子見")
+
+    else:
+        st.error("★★☆☆☆　弱い")
+
+    st.write("### 判定理由")
+
+    for reason in signal["reasons"]:
+
+        st.write("✅", reason)
