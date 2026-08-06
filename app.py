@@ -1,5 +1,6 @@
 import streamlit as st
 import plotly.graph_objects as go
+from modules.charts import create_candlestick_chart
 
 from modules.technical import (
     get_history,
@@ -185,77 +186,16 @@ history["MA75"] = history["Close"].rolling(75).mean()
 
 st.dataframe(history.tail())
 
-fig = go.Figure()
-
-# ローソク足
-fig.add_trace(
-    go.Candlestick(
-        x=history.index,
-        open=history["Open"],
-        high=history["High"],
-        low=history["Low"],
-        close=history["Close"],
-        name="株価",
-
-        increasing_line_color="#26A69A",
-        increasing_fillcolor="#26A69A",
-
-        decreasing_line_color="#EF5350",
-        decreasing_fillcolor="#EF5350",
-    )
+fig = create_candlestick_chart(
+    history,
+    st.session_state.selected_code,
+    st.session_state.selected_company,
 )
 
-# 25日移動平均
-fig.add_trace(
-    go.Scatter(
-        x=history.index,
-        y=history["MA25"],
-        mode="lines",
-        name="25日MA",
-
-        line=dict(
-            color="#2962FF",
-            width=2,
-        ),
-    )
+st.plotly_chart(
+    fig,
+    use_container_width=True,
 )
-
-# 75日移動平均
-fig.add_trace(
-    go.Scatter(
-        x=history.index,
-        y=history["MA75"],
-        mode="lines",
-        name="75日MA",
-
-        line=dict(
-            color="#FF9800",
-            width=2,
-        ),
-    )
-)
-
-fig.update_layout(
-    title=f"{st.session_state.selected_code} {st.session_state.selected_company}",
-    xaxis_title="日付",
-    yaxis_title="株価（円）",
-    height=600,
-    template="plotly_white",
-    hovermode="x unified",
-    xaxis_rangeslider_visible=False,
-
-    xaxis=dict(
-        tickformat="%Y/%m/%d",
-        tickangle=-45,
-        showgrid=True,
-    ),
-
-    yaxis=dict(
-        showgrid=True,
-    ),
-)
-
-st.plotly_chart(fig, use_container_width=True)
 
 ma25 = get_ma(st.session_state.selected_code)
 ma75 = get_ma(st.session_state.selected_code, 75)
