@@ -35,7 +35,7 @@ st.set_page_config(
     layout="wide",
 )
 
-st.title("📈 AI Investment Assistant")
+st.title("AI Investment Assistant")
 
 # -----------------------------
 # 選択中の銘柄
@@ -49,47 +49,53 @@ if "selected_company" not in st.session_state:
 st.divider()
 
 # -----------------------------
-# 銘柄追加
+# 銘柄検索・追加
 # -----------------------------
 
-st.subheader("➕ 銘柄追加")
+col_search, col_button = st.columns([8, 1])
 
-code = st.text_input("銘柄コード")
+with col_search:
 
-company = ""
-
-if code:
-
-    company = get_company_name(code)
-
-if company:
-
-    st.text_input(
-        "会社名",
-        value=company,
-        disabled=True,
+    search_code = st.text_input(
+        "銘柄検索",
+        placeholder="銘柄コードを入力（例：7203）",
+        label_visibility="collapsed",
     )
 
-else:
+with col_button:
 
-    st.text_input(
-        "会社名",
-        value="",
+    search_button = st.button(
+        "追加",
+        use_container_width=True,
     )
 
-if st.button("追加"):
+if search_button:
 
-    if code and company:
+    if search_code:
 
-        add_stock(code, company)
+        company_name = get_company_name(search_code)
 
-        st.success("追加しました")
+        if company_name:
 
-        st.rerun()
+            add_stock(search_code, company_name)
+
+            st.success(
+                f"{search_code} {company_name} を追加しました"
+            )
+
+            st.rerun()
+
+        else:
+
+            st.warning(
+                "銘柄が見つかりませんでした"
+            )
 
     else:
 
-        st.warning("正しい銘柄コードを入力してください")
+        st.warning(
+            "銘柄コードを入力してください"
+        )
 
 st.divider()
 
@@ -97,85 +103,70 @@ st.divider()
 # 監視銘柄
 # -----------------------------
 
-st.subheader("📋 監視銘柄")
+st.subheader("監視銘柄")
 
 stocks = get_stocks()
 
 if len(stocks) == 0:
 
-    st.info("まだ登録されていません")
+    st.info("監視銘柄がありません")
 
 else:
 
-    for stock in stocks:
+    columns = st.columns(len(stocks))
+
+    for index, stock in enumerate(stocks):
 
         stock_id, code, company = stock
 
-        stock_info = get_stock_price(code)
-        
-        if st.button(f"📈 {code} {company}", key=f"select_{stock_id}"):
+        with columns[index]:
 
-            st.session_state.selected_code = code
+            stock_info = get_stock_price(code)
 
-            st.session_state.selected_company = company
+            if st.button(
+                f"{code}  {company}",
+                key=f"select_{stock_id}",
+                use_container_width=True,
+            ):
 
-            st.rerun()
+                st.session_state.selected_code = code
+                st.session_state.selected_company = company
 
-        col1, col2 = st.columns([8, 1])
-
-        with col1:
-
-            st.subheader(f"{code}　{company}")
+                st.rerun()
 
             if stock_info:
 
                 price = stock_info["price"]
-
                 previous = stock_info["previous_close"]
 
                 if price and previous:
 
                     diff = price - previous
-
                     rate = diff / previous * 100
 
-                    st.write(f"現在価格：{price:.2f} 円")
+                    st.metric(
+                        "株価",
+                        f"{price:.2f} 円",
+                        f"{diff:+.2f} ({rate:+.2f}%)",
+                    )
 
-                    if diff >= 0:
-
-                        st.success(
-                            f"前日比：+{diff:.2f} 円 ({rate:.2f}%)"
-                        )
-
-                    else:
-
-                        st.error(
-                            f"前日比：{diff:.2f} 円 ({rate:.2f}%)"
-                        )
-
-                else:
-
-                    st.warning("株価取得失敗")
-
-            else:
-
-                st.warning("株価取得失敗")
-
-        with col2:
-
-            if st.button("🗑", key=f"delete_{stock_id}"):
+            if st.button(
+                "削除",
+                key=f"delete_{stock_id}",
+                use_container_width=True,
+            ):
 
                 delete_stock(stock_id)
 
                 st.rerun()
 
-        st.divider()
+st.divider()
 
 # -----------------------------
 # テクニカル分析
 # -----------------------------
 
-st.subheader("🧪 テクニカルテスト")
+st.subheader("テクニカル分析")
 
 history = get_history(
     st.session_state.selected_code
@@ -202,7 +193,7 @@ ma75 = get_ma(st.session_state.selected_code, 75)
 rsi = get_rsi(st.session_state.selected_code)
 macd_history = get_macd(st.session_state.selected_code)
 
-st.subheader("📊 MACD")
+st.subheader("MACD")
 
 fig_macd = go.Figure()
 
@@ -292,7 +283,7 @@ with col4:
 
     st.divider()
 
-st.subheader("🤖 AI売買シグナル")
+st.subheader("AI売買シグナル")
 
 signal = analyze_stock(st.session_state.selected_code)
 
@@ -316,4 +307,4 @@ if signal:
 
     for reason in signal["reasons"]:
 
-        st.write("✅", reason)
+        st.write("", reason)
