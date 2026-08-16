@@ -163,6 +163,42 @@ else:
 st.divider()
 
 # -----------------------------
+# 表示設定
+# -----------------------------
+
+st.subheader("表示")
+
+display_col1, display_col2, display_col3, display_col4 = st.columns(4)
+
+with display_col1:
+
+    show_chart = st.toggle(
+        "株価チャート",
+        value=True,
+    )
+
+with display_col2:
+
+    show_macd = st.toggle(
+        "MACD",
+        value=True,
+    )
+
+with display_col3:
+
+    show_rsi = st.toggle(
+        "RSI",
+        value=True,
+    )
+
+with display_col4:
+
+    show_ai = st.toggle(
+        "AI分析",
+        value=True,
+    )
+    
+# -----------------------------
 # テクニカル分析
 # -----------------------------
 
@@ -177,134 +213,158 @@ history["MA75"] = history["Close"].rolling(75).mean()
 
 st.dataframe(history.tail())
 
-fig = create_candlestick_chart(
-    history,
-    st.session_state.selected_code,
-    st.session_state.selected_company,
-)
+if show_chart:
 
-st.plotly_chart(
-    fig,
-    use_container_width=True,
-)
+    fig = create_candlestick_chart(
+        history,
+        st.session_state.selected_code,
+        st.session_state.selected_company,
+    )
+
+    st.plotly_chart(
+        fig,
+        use_container_width=True,
+    )
 
 ma25 = get_ma(st.session_state.selected_code)
 ma75 = get_ma(st.session_state.selected_code, 75)
 rsi = get_rsi(st.session_state.selected_code)
 macd_history = get_macd(st.session_state.selected_code)
 
-st.subheader("MACD")
+if show_macd:
 
-fig_macd = go.Figure()
+    st.subheader("MACD")
 
-# MACD
-fig_macd.add_trace(
-    go.Scatter(
-        x=macd_history.index,
-        y=macd_history["MACD"],
-        mode="lines",
-        name="MACD",
-        line=dict(
-            color="#2962FF",
-            width=2,
-        ),
+    fig_macd = go.Figure()
+
+    # MACD
+    fig_macd.add_trace(
+        go.Scatter(
+            x=macd_history.index,
+            y=macd_history["MACD"],
+            mode="lines",
+            name="MACD",
+            line=dict(
+                color="#2962FF",
+                width=2,
+            ),
+        )
     )
-)
 
-# Signal
-fig_macd.add_trace(
-    go.Scatter(
-        x=macd_history.index,
-        y=macd_history["Signal"],
-        mode="lines",
-        name="Signal",
-        line=dict(
-            color="#FF9800",
-            width=2,
-        ),
+    # Signal
+    fig_macd.add_trace(
+        go.Scatter(
+            x=macd_history.index,
+            y=macd_history["Signal"],
+            mode="lines",
+            name="Signal",
+            line=dict(
+                color="#FF9800",
+                width=2,
+            ),
+        )
     )
-)
 
-# Histogram
-fig_macd.add_trace(
-    go.Bar(
-        x=macd_history.index,
-        y=macd_history["Histogram"],
-        name="Histogram",
-        marker_color=[
-            "#26A69A" if x >= 0 else "#EF5350"
-            for x in macd_history["Histogram"]
-        ],
+    # Histogram
+    fig_macd.add_trace(
+        go.Bar(
+            x=macd_history.index,
+            y=macd_history["Histogram"],
+            name="Histogram",
+            marker_color=[
+                "#26A69A" if x >= 0 else "#EF5350"
+                for x in macd_history["Histogram"]
+            ],
+        )
     )
-)
 
-fig_macd.update_layout(
-    title="MACD",
-    height=300,
-    template="plotly_white",
-    hovermode="x unified",
-    xaxis=dict(
-        title="日付",
-        tickformat="%Y/%m/%d",
-        tickangle=-45,
-        showgrid=True,
-    ),
-    yaxis=dict(
+    fig_macd.update_layout(
         title="MACD",
-        showgrid=True,
-    ),
-)
+        height=300,
+        template="plotly_white",
+        hovermode="x unified",
+        xaxis=dict(
+            title="日付",
+            tickformat="%Y/%m/%d",
+            tickangle=-45,
+            showgrid=True,
+        ),
+        yaxis=dict(
+            title="MACD",
+            showgrid=True,
+        ),
+    )
 
-st.plotly_chart(fig_macd, use_container_width=True)
+    st.plotly_chart(
+        fig_macd,
+        use_container_width=True,
+    )
 
 macd_value = macd_history["MACD"].iloc[-1]
 signal_value = macd_history["Signal"].iloc[-1]
 
-col1, col2, col3, col4 = st.columns(4)
+if show_rsi:
 
-with col1:
-    st.metric("25日移動平均", f"{ma25:.2f} 円")
+    st.subheader("RSI")
 
-with col2:
-    st.metric("75日移動平均", f"{ma75:.2f} 円")
+    col1, col2 = st.columns(2)
 
-with col3:
-    st.metric("RSI", f"{rsi:.2f}")
+    with col1:
 
-    if rsi >= 70:
-        st.error("買われすぎ")
-    elif rsi <= 30:
-        st.success("売られすぎ")
-    else:
-        st.info("中立")
+        st.metric(
+            "RSI",
+            f"{rsi:.2f}"
+        )
 
-with col4:
-    st.metric("MACD", f"{macd_value:.2f}")
+    with col2:
+
+        if rsi >= 70:
+
+            st.error("買われすぎ")
+
+        elif rsi <= 30:
+
+            st.success("売られすぎ")
+
+        else:
+
+            st.info("中立")
 
     st.divider()
 
-st.subheader("AI売買シグナル")
+if show_ai:
 
-signal = analyze_stock(st.session_state.selected_code)
+    st.subheader("AI売買シグナル")
 
-if signal:
+    signal = analyze_stock(
+        st.session_state.selected_code
+    )
 
-    st.metric("総合スコア", f"{signal['score']} 点")
+    if signal:
 
-    if signal["score"] >= 80:
-        st.success("★★★★★　強い買い")
+        st.metric(
+            "総合スコア",
+            f"{signal['score']} 点"
+        )
 
-    elif signal["score"] >= 60:
-        st.info("★★★★☆　買い")
+        if signal["score"] >= 80:
 
-    elif signal["score"] >= 40:
-        st.warning("★★★☆☆　様子見")
+            st.success("★★★★★　強い買い")
 
-    else:
-        st.error("★★☆☆☆　弱い")
+        elif signal["score"] >= 60:
 
-    st.write("### 判定理由")
+            st.info("★★★★☆　買い")
 
-    for reason in signal["reasons"]:
+        elif signal["score"] >= 40:
 
-        st.write("", reason)
+            st.warning("★★★☆☆　様子見")
+
+        else:
+
+            st.error("★★☆☆☆　弱い")
+
+        st.write("### 判定理由")
+
+        for reason in signal["reasons"]:
+
+            st.write(reason)
