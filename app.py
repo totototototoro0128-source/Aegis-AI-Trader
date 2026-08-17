@@ -9,6 +9,11 @@ from modules.technical import (
     get_macd,
 )
 
+from modules.widgets import (
+    show_macd,
+    show_rsi,
+)
+
 from modules.database import init_db
 
 from modules.watchlist import (
@@ -179,17 +184,17 @@ with display_col1:
 
 with display_col2:
 
-    show_macd = st.toggle(
-        "MACD",
-        value=True,
-    )
+    show_macd_widget = st.toggle(
+    "MACD",
+    value=True,
+)
 
 with display_col3:
 
-    show_rsi = st.toggle(
-        "RSI",
-        value=True,
-    )
+    show_rsi_widget = st.toggle(
+    "RSI",
+    value=True,
+)
 
 with display_col4:
 
@@ -202,7 +207,10 @@ with display_col4:
 # テクニカル分析
 # -----------------------------
 
-st.subheader("テクニカル分析")
+st.subheader(
+    f"{st.session_state.selected_code} "
+    f"{st.session_state.selected_company}"
+)
 
 history = get_history(
     st.session_state.selected_code
@@ -211,7 +219,6 @@ history = get_history(
 history["MA25"] = history["Close"].rolling(25).mean()
 history["MA75"] = history["Close"].rolling(75).mean()
 
-st.dataframe(history.tail())
 
 if show_chart:
 
@@ -231,106 +238,34 @@ ma75 = get_ma(st.session_state.selected_code, 75)
 rsi = get_rsi(st.session_state.selected_code)
 macd_history = get_macd(st.session_state.selected_code)
 
-if show_macd:
+if show_macd_widget:
 
-    st.subheader("MACD")
-
-    fig_macd = go.Figure()
-
-    # MACD
-    fig_macd.add_trace(
-        go.Scatter(
-            x=macd_history.index,
-            y=macd_history["MACD"],
-            mode="lines",
-            name="MACD",
-            line=dict(
-                color="#2962FF",
-                width=2,
-            ),
-        )
-    )
-
-    # Signal
-    fig_macd.add_trace(
-        go.Scatter(
-            x=macd_history.index,
-            y=macd_history["Signal"],
-            mode="lines",
-            name="Signal",
-            line=dict(
-                color="#FF9800",
-                width=2,
-            ),
-        )
-    )
-
-    # Histogram
-    fig_macd.add_trace(
-        go.Bar(
-            x=macd_history.index,
-            y=macd_history["Histogram"],
-            name="Histogram",
-            marker_color=[
-                "#26A69A" if x >= 0 else "#EF5350"
-                for x in macd_history["Histogram"]
-            ],
-        )
-    )
-
-    fig_macd.update_layout(
-        title="MACD",
-        height=300,
-        template="plotly_white",
-        hovermode="x unified",
-        xaxis=dict(
-            title="日付",
-            tickformat="%Y/%m/%d",
-            tickangle=-45,
-            showgrid=True,
-        ),
-        yaxis=dict(
-            title="MACD",
-            showgrid=True,
-        ),
-    )
-
-    st.plotly_chart(
-        fig_macd,
-        use_container_width=True,
-    )
+    show_macd(macd_history)
 
 macd_value = macd_history["MACD"].iloc[-1]
 signal_value = macd_history["Signal"].iloc[-1]
 
-if show_rsi:
+if show_macd:
 
-    st.subheader("RSI")
+    macd_col1, macd_col2 = st.columns(2)
 
-    col1, col2 = st.columns(2)
-
-    with col1:
+    with macd_col1:
 
         st.metric(
-            "RSI",
-            f"{rsi:.2f}"
+            "MACD",
+            f"{macd_value:.2f}"
         )
 
-    with col2:
+    with macd_col2:
 
-        if rsi >= 70:
+        st.metric(
+            "Signal",
+            f"{signal_value:.2f}"
+        )
 
-            st.error("買われすぎ")
+if show_rsi:
 
-        elif rsi <= 30:
-
-            st.success("売られすぎ")
-
-        else:
-
-            st.info("中立")
-
-    st.divider()
+    show_rsi(rsi)
 
 if show_ai:
 
