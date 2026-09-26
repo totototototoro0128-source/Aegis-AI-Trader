@@ -53,7 +53,7 @@ def create_candlestick_chart(history, code, company):
 
     fig.update_layout(
         title=f"{code} {company}",
-        template="plotly_white",
+        template="plotly_dark",
         hovermode="x unified",
         xaxis_rangeslider_visible=False,
         height=600,

@@ -1,18 +1,16 @@
 import streamlit as st
-import plotly.graph_objects as go
-from modules.charts import create_candlestick_chart
 
 from modules.technical import (
     get_history,
-    get_ma,
     get_rsi,
     get_macd,
 )
 
-from modules.widgets import (
-    show_macd,
-    show_rsi,
-)
+from modules.layout_dashboard import show_layout_dashboard
+from modules.market_monitor import show_market_monitor
+from modules.terminal_ui import show_terminal_header
+from modules.paper_trading import show_paper_trading_demo
+from modules.stock_paper_trading import show_stock_paper_trading_demo
 
 from modules.database import init_db
 
@@ -35,12 +33,38 @@ from modules.company import get_company_name
 init_db()
 
 st.set_page_config(
-    page_title="AI Investment Assistant",
+    page_title="AEGIS // AI TRADER",
     page_icon="📈",
     layout="wide",
 )
 
-st.title("AI Investment Assistant")
+st.markdown(
+    """
+    <style>
+        [data-testid="stAppViewContainer"] { background: #05080d; color: #d8e1ea; }
+        [data-testid="stHeader"] { background: transparent; }
+        [data-testid="stSidebar"] { background: #080d14; }
+        h1, h2, h3 { color: #e8f1f8 !important; font-family: Consolas, monospace; }
+        [data-testid="stMetric"] { background: #0a111a; border: 1px solid #1d3343; padding: 0.75rem; }
+        [data-testid="stMetricValue"] { color: #65e6b2; }
+        hr { border-color: #1d3343 !important; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.title("AEGIS // AI TRADER")
+
+show_terminal_header()
+
+show_market_monitor()
+st.divider()
+
+show_paper_trading_demo()
+st.divider()
+
+show_stock_paper_trading_demo()
+st.divider()
 
 # -----------------------------
 # 選択中の銘柄
@@ -220,86 +244,22 @@ history["MA25"] = history["Close"].rolling(25).mean()
 history["MA75"] = history["Close"].rolling(75).mean()
 
 
-if show_chart:
-
-    fig = create_candlestick_chart(
-        history,
-        st.session_state.selected_code,
-        st.session_state.selected_company,
-    )
-
-    st.plotly_chart(
-        fig,
-        use_container_width=True,
-    )
-
-ma25 = get_ma(st.session_state.selected_code)
-ma75 = get_ma(st.session_state.selected_code, 75)
 rsi = get_rsi(st.session_state.selected_code)
 macd_history = get_macd(st.session_state.selected_code)
 
-if show_macd_widget:
+signal = analyze_stock(st.session_state.selected_code) if show_ai else None
 
-    show_macd(macd_history)
-
-macd_value = macd_history["MACD"].iloc[-1]
-signal_value = macd_history["Signal"].iloc[-1]
-
-if show_macd:
-
-    macd_col1, macd_col2 = st.columns(2)
-
-    with macd_col1:
-
-        st.metric(
-            "MACD",
-            f"{macd_value:.2f}"
-        )
-
-    with macd_col2:
-
-        st.metric(
-            "Signal",
-            f"{signal_value:.2f}"
-        )
-
-if show_rsi:
-
-    show_rsi(rsi)
-
-if show_ai:
-
-    st.subheader("AI売買シグナル")
-
-    signal = analyze_stock(
-        st.session_state.selected_code
-    )
-
-    if signal:
-
-        st.metric(
-            "総合スコア",
-            f"{signal['score']} 点"
-        )
-
-        if signal["score"] >= 80:
-
-            st.success("★★★★★　強い買い")
-
-        elif signal["score"] >= 60:
-
-            st.info("★★★★☆　買い")
-
-        elif signal["score"] >= 40:
-
-            st.warning("★★★☆☆　様子見")
-
-        else:
-
-            st.error("★★☆☆☆　弱い")
-
-        st.write("### 判定理由")
-
-        for reason in signal["reasons"]:
-
-            st.write(reason)
+show_layout_dashboard(
+    history,
+    st.session_state.selected_code,
+    st.session_state.selected_company,
+    macd_history,
+    rsi,
+    signal,
+    {
+        "stock_chart": show_chart,
+        "macd": show_macd_widget,
+        "rsi": show_rsi_widget,
+        "ai_signal": show_ai,
+    },
+)

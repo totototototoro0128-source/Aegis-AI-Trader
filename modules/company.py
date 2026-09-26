@@ -1,5 +1,10 @@
 import yfinance as yf
 
+from modules.yfinance_config import configure_yfinance_cache
+
+
+configure_yfinance_cache()
+
 
 def get_company_name(code):
 
