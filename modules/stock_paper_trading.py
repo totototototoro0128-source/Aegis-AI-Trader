@@ -17,6 +17,7 @@ from modules.trading.repository import (
 )
 from modules.trading.risk import calculate_position_notional, may_open_position
 from modules.yfinance_config import configure_yfinance_cache
+from modules.runtime_mode import is_public_site, now_jst
 
 
 configure_yfinance_cache()
@@ -37,7 +38,7 @@ STOCK_MODES = {
 
 
 def _initial_state():
-    now = datetime.now()
+    now = now_jst()
     return {
         "running": False,
         "initial_capital": INITIAL_CAPITAL,
@@ -56,13 +57,30 @@ def _initial_state():
 
 def _state():
     if "stock_paper_trading" not in st.session_state:
-        st.session_state.stock_paper_trading = load_state(ACCOUNT_ID) or _initial_state()
+        st.session_state.stock_paper_trading = (
+            _initial_state() if is_public_site() else load_state(ACCOUNT_ID) or _initial_state()
+        )
     state = st.session_state.stock_paper_trading
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = now_jst().strftime("%Y-%m-%d")
     if state.get("daily_pnl_date") != today:
         state["daily_realized_pnl"] = 0.0
         state["daily_pnl_date"] = today
     return state
+
+
+def _save(state):
+    if not is_public_site():
+        save_state(state, ACCOUNT_ID)
+
+
+def _reset(state):
+    if not is_public_site():
+        reset_state(state, ACCOUNT_ID)
+
+
+def _save_symbols(symbols, enabled):
+    if not is_public_site():
+        save_symbol_settings(ACCOUNT_ID, symbols, enabled)
 
 
 def _market_open():
@@ -173,10 +191,12 @@ def _stock_figure(label, symbol, position=None, sessions=1):
 
 def _symbols():
     if "stock_auto_symbols" not in st.session_state:
-        catalog, enabled = load_symbol_settings(ACCOUNT_ID)
+        catalog, enabled = (
+            ({}, []) if is_public_site() else load_symbol_settings(ACCOUNT_ID)
+        )
         if not catalog:
             catalog, enabled = dict(STOCKS), list(STOCKS)
-            save_symbol_settings(ACCOUNT_ID, catalog, enabled)
+            _save_symbols(catalog, enabled)
         st.session_state.stock_auto_symbols = catalog
         st.session_state.stock_universe = enabled
     return st.session_state.stock_auto_symbols
@@ -194,7 +214,7 @@ def _close(state, key, mid_price, reason, config):
     cost = mid_price * config["slippage_bps"] / 10_000 * position["shares"]
     state["realized_pnl"] += pnl
     state["daily_realized_pnl"] += pnl
-    state["trades"].insert(0, {"時刻": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "銘柄": key, "売買": "SELL", "株数": position["shares"], "価格": round(price, 1), "損益": round(pnl), "コスト": round(cost), "理由": reason})
+    state["trades"].insert(0, {"時刻": now_jst().strftime("%Y-%m-%d %H:%M:%S"), "銘柄": key, "売買": "SELL", "株数": position["shares"], "価格": round(price, 1), "損益": round(pnl), "コスト": round(cost), "理由": reason})
 
 
 def _evaluate(state, mode, universe, symbols):
@@ -232,7 +252,7 @@ def _evaluate(state, mode, universe, symbols):
             actual_notional = shares * entry
             cost = data["price"] * config["slippage_bps"] / 10_000 * shares
             state["positions"][key] = {"side": "LONG", "entry_price": entry, "shares": shares, "units": shares, "notional": actual_notional}
-            state["trades"].insert(0, {"時刻": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "銘柄": key, "売買": "BUY", "株数": shares, "価格": round(entry, 1), "損益": 0, "コスト": round(cost), "理由": f"自動シグナル（RSI {data['rsi']:.1f}）"})
+            state["trades"].insert(0, {"時刻": now_jst().strftime("%Y-%m-%d %H:%M:%S"), "銘柄": key, "売買": "BUY", "株数": shares, "価格": round(entry, 1), "損益": 0, "コスト": round(cost), "理由": f"自動シグナル（RSI {data['rsi']:.1f}）"})
     return quotes
 
 
@@ -242,6 +262,8 @@ def show_stock_paper_trading_demo():
     symbols = _symbols()
     st.subheader("JP STOCK AUTO TRADER // DEMO")
     st.caption("日本株のペーパートレード専用です。100株単位・買いのみで、実注文は行いません。")
+    if is_public_site():
+        st.caption("公開デモ: このタブだけの口座です。ページを再読み込みすると初期状態に戻ります。")
 
     add_code, add_button = st.columns([4, 1])
     code = add_code.text_input(
@@ -264,7 +286,7 @@ def show_stock_paper_trading_demo():
                 if label not in selected:
                     selected.append(label)
                 st.session_state.stock_universe = selected
-                save_symbol_settings(ACCOUNT_ID, symbols, selected)
+                _save_symbols(symbols, selected)
                 st.success(f"{label} を自動取引対象へ追加しました。")
                 st.rerun(scope="fragment")
 
@@ -272,24 +294,24 @@ def show_stock_paper_trading_demo():
     previous_mode = state.get("mode", "標準")
     mode = c1.selectbox("株式運用モード", list(STOCK_MODES), index=list(STOCK_MODES).index(previous_mode), key="stock_mode")
     universe = c2.multiselect("自動取引対象", list(symbols), key="stock_universe")
-    if universe != load_symbol_settings(ACCOUNT_ID)[1]:
-        save_symbol_settings(ACCOUNT_ID, symbols, universe)
+    if not is_public_site() and universe != load_symbol_settings(ACCOUNT_ID)[1]:
+        _save_symbols(symbols, universe)
     state["mode"] = mode
     if mode != previous_mode:
-        save_state(state, ACCOUNT_ID)
+        _save(state)
 
     b1, b2, b3 = st.columns(3)
     if b1.button("▶ 株式デモ開始", width="stretch"):
         state["running"] = True
-        save_state(state, ACCOUNT_ID)
+        _save(state)
         st.rerun(scope="fragment")
     if b2.button("■ 株式デモ停止", width="stretch"):
         state["running"] = False
-        save_state(state, ACCOUNT_ID)
+        _save(state)
         st.rerun(scope="fragment")
     if b3.button("↺ 株式口座リセット", width="stretch"):
         st.session_state.stock_paper_trading = _initial_state()
-        reset_state(st.session_state.stock_paper_trading, ACCOUNT_ID)
+        _reset(st.session_state.stock_paper_trading)
         st.rerun(scope="fragment")
 
     quotes = _evaluate(state, mode, universe, symbols) if state["running"] else {}
@@ -305,9 +327,9 @@ def show_stock_paper_trading_demo():
     equity = state["initial_capital"] + state["realized_pnl"] + unrealized
     state["peak_equity"] = max(state.get("peak_equity", equity), equity)
     if state["running"]:
-        state["equity_history"].append({"time": datetime.now().isoformat(), "equity": equity})
+        state["equity_history"].append({"time": now_jst().isoformat(), "equity": equity})
         state["equity_history"] = state["equity_history"][-500:]
-        save_state(state, ACCOUNT_ID)
+        _save(state)
 
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("稼働状態", "RUNNING" if state["running"] else "STOPPED")

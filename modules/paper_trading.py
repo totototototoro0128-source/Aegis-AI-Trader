@@ -8,6 +8,7 @@ import streamlit as st
 import yfinance as yf
 
 from modules.yfinance_config import configure_yfinance_cache
+from modules.runtime_mode import is_public_site, now_jst
 from modules.trading.repository import load_state, reset_state, save_state
 from modules.trading.risk import calculate_position_notional, may_open_position
 from modules.trading.backtest import show_backtest_panel
@@ -75,30 +76,42 @@ def _initial_state():
         "capital": INITIAL_CAPITAL,
         "realized_pnl": 0.0,
         "daily_realized_pnl": 0.0,
-        "daily_pnl_date": datetime.now().strftime("%Y-%m-%d"),
+        "daily_pnl_date": now_jst().strftime("%Y-%m-%d"),
         "peak_equity": INITIAL_CAPITAL,
         "mode": "標準",
         "positions": {},
         "trades": [],
         "last_bar": {},
         "equity_history": [
-            {"time": datetime.now().isoformat(), "equity": INITIAL_CAPITAL}
+            {"time": now_jst().isoformat(), "equity": INITIAL_CAPITAL}
         ],
     }
 
 
 def _state():
     if "paper_trading" not in st.session_state:
-        st.session_state.paper_trading = load_state() or _initial_state()
+        st.session_state.paper_trading = (
+            _initial_state() if is_public_site() else load_state() or _initial_state()
+        )
     st.session_state.paper_trading.setdefault(
         "equity_history",
-        [{"time": datetime.now().isoformat(), "equity": INITIAL_CAPITAL}],
+        [{"time": now_jst().isoformat(), "equity": INITIAL_CAPITAL}],
     )
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = now_jst().strftime("%Y-%m-%d")
     if st.session_state.paper_trading.get("daily_pnl_date") != today:
         st.session_state.paper_trading["daily_realized_pnl"] = 0.0
         st.session_state.paper_trading["daily_pnl_date"] = today
     return st.session_state.paper_trading
+
+
+def _save(state):
+    if not is_public_site():
+        save_state(state)
+
+
+def _reset(state):
+    if not is_public_site():
+        reset_state(state)
 
 
 @st.cache_data(ttl=25, show_spinner=False)
@@ -213,7 +226,7 @@ def _equity_figure(state):
 
 
 def _record_equity(state, equity):
-    now = datetime.now()
+    now = now_jst()
     history = state["equity_history"]
     if history and (now - datetime.fromisoformat(history[-1]["time"])).total_seconds() < 25:
         history[-1] = {"time": now.isoformat(), "equity": equity}
@@ -239,7 +252,7 @@ def _close_position(state, pair, mid_price, reason, config):
     state["trades"].insert(
         0,
         {
-            "時刻": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "時刻": now_jst().strftime("%Y-%m-%d %H:%M:%S"),
             "通貨ペア": pair,
             "売買": f"{position['side']} 決済",
             "価格": round(price, 3),
@@ -305,7 +318,7 @@ def _evaluate(state, mode):
                 state["trades"].insert(
                     0,
                     {
-                        "時刻": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "時刻": now_jst().strftime("%Y-%m-%d %H:%M:%S"),
                         "通貨ペア": pair,
                         "売買": side,
                         "価格": round(entry_price, 3),
@@ -325,6 +338,8 @@ def show_paper_trading_demo():
     state = _state()
     st.subheader("FX AUTO TRADER // DEMO")
     st.caption("ペーパートレード専用です。実際の注文・送金・証券口座接続は行いません。")
+    if is_public_site():
+        st.caption("公開デモ: このタブだけの口座です。ページを再読み込みすると初期状態に戻ります。")
 
     control1, control2, control3, control4 = st.columns([2, 1, 1, 1])
     with control1:
@@ -332,21 +347,21 @@ def show_paper_trading_demo():
         mode = st.selectbox("運用モード", list(MODE_CONFIG), index=default_index, key="paper_mode")
         if mode != state.get("mode"):
             state["mode"] = mode
-            save_state(state)
+            _save(state)
     with control2:
         if st.button("▶ 開始", width="stretch"):
             state["running"] = True
-            save_state(state)
+            _save(state)
             st.rerun(scope="fragment")
     with control3:
         if st.button("■ 停止", width="stretch"):
             state["running"] = False
-            save_state(state)
+            _save(state)
             st.rerun(scope="fragment")
     with control4:
         if st.button("↺ リセット", width="stretch"):
             st.session_state.paper_trading = _initial_state()
-            reset_state(st.session_state.paper_trading)
+            _reset(st.session_state.paper_trading)
             st.rerun(scope="fragment")
 
     quotes = _evaluate(state, mode) if state["running"] else {}
@@ -374,7 +389,7 @@ def show_paper_trading_demo():
     state["peak_equity"] = max(state.get("peak_equity", equity), equity)
     if state["running"]:
         _record_equity(state, equity)
-        save_state(state)
+        _save(state)
     total_cost = sum(float(trade.get("コスト", 0.0)) for trade in state["trades"])
     m1, m2, m3, m4, m5 = st.columns(5)
     m1.metric("稼働状態", "RUNNING" if state["running"] else "STOPPED")
